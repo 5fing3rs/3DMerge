@@ -7,8 +7,10 @@
 ### Date : 29-09-17
 ### Time : 16:05-16:23
 ### Topic: Third Client Meet
-### Attendees: #Pulkit Gera, Sarthak Singhal,Anush Amar Mahajan#
-
+### Attendees: 
+```
+Pulkit Gera Anush Amar Mahajan Sarthak Singhal
+```
 Type | Description | Owner | Deadline
 ---- | ---- | ---- | ----
 Sharing the work | Update the repo with code and other necessary documents | ALL | As we update the code
