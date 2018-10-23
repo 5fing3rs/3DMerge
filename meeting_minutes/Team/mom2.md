@@ -7,7 +7,10 @@
 ### Date : 26-08-17
 ### Time : 17:15-17:30
 ### Topic: Second Client Meet
-### Attendees: #Pulkit Gera# #Anush Amar Mahajan# #Sarthak Singhal#
+### Attendees: 
+```
+Pulkit Gera Anush Amar Mahajan Sarthak Singhal
+```
 
 Type | Description | Owner | Deadline
 ---- | ---- | ---- | ----
