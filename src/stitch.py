@@ -2,7 +2,7 @@
 # python stitch.py --first images/bryce_left_01.png --second images/bryce_right_01.png 
 
 # import the necessary packages
-from pyimagesearch.panorama import Stitcher
+from panorama import Stitcher
 import argparse
 import imutils
 import cv2
@@ -22,13 +22,15 @@ imageB = cv2.imread(args["second"])
 imageA = imutils.resize(imageA, width=500)
 imageB = imutils.resize(imageB, width=500)
 
+# imageA = imageA[-250:,250:]
+# imageB = imageB[:250,:250]
 # stitch the images together to create a panorama
 stitcher = Stitcher()
-(result, vis) = stitcher.stitch([imageA, imageB], showMatches=True)
+(result, vis, imageB1) = stitcher.stitch([imageA, imageB], showMatches=True)
 
 # show the images
-# cv2.imshow("Image A", imageA)
-# cv2.imshow("Image B", imageB)
-# cv2.imshow("Keypoint Matches", vis)
-# cv2.imshow("Result", result)
-# cv2.waitKey(0)
+cv2.imshow("Image A", imageA)
+cv2.imshow("Image B1", imageB1)
+cv2.imshow("Keypoint Matches", vis)
+cv2.imshow("Result", result)
+cv2.waitKey(0)
