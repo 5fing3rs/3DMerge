@@ -15,7 +15,7 @@ class Stitcher:
 		(imageB, imageA) = images
 		(kpsA, featuresA) = self.detectAndDescribe(imageA)
 		(kpsB, featuresB) = self.detectAndDescribe(imageB)
-
+		# print(kpsA)
 		# match features between the two images
 		M = self.matchKeypoints(kpsA, kpsB,
 			featuresA, featuresB, ratio, reprojThresh)
@@ -32,6 +32,7 @@ class Stitcher:
 			(imageA.shape[1] + imageB.shape[1], imageA.shape[0]))
 		result[0:imageB.shape[0], 0:imageB.shape[1]] = imageB
 
+		imageB1 = cv2.warpPerspective(imageB, H,(imageB.shape[1],imageB.shape[0]))
 		# check to see if the keypoint matches should be visualized
 		if showMatches:
 			vis = self.drawMatches(imageA, imageB, kpsA, kpsB, matches,
@@ -39,10 +40,10 @@ class Stitcher:
 
 			# return a tuple of the stitched image and the
 			# visualization
-			return (result, vis)
+			return (result, vis, imageB1)
 
 		# return the stitched image
-		return result
+		return (result, imageB1)
 
 	def detectAndDescribe(self, image):
 		# convert the image to grayscale
@@ -52,6 +53,7 @@ class Stitcher:
 		if self.isv3:
 			# detect and extract features from the image
 			descriptor = cv2.xfeatures2d.SIFT_create()
+			# descriptor = cv2.ORB_create(nfeatures=10000)
 			(kps, features) = descriptor.detectAndCompute(image, None)
 
 		# otherwise, we are using OpenCV 2.4.X
@@ -75,7 +77,8 @@ class Stitcher:
 		ratio, reprojThresh):
 		# compute the raw matches and initialize the list of actual
 		# matches
-		matcher = cv2.DescriptorMatcher_create("BruteForce")
+		matcher = cv2.DescriptorMatcher_create("FlannBased")
+		# matcher = cv2.DescriptorMatcher_create("BruteForce")
 		rawMatches = matcher.knnMatch(featuresA, featuresB, 2)
 		matches = []
 
@@ -92,17 +95,81 @@ class Stitcher:
 			ptsA = np.float32([kpsA[i] for (_, i) in matches])
 			ptsB = np.float32([kpsB[i] for (i, _) in matches])
 
+			# print(matches)
+
 			# compute the homography between the two sets of points
 			(H, status) = cv2.findHomography(ptsA, ptsB, cv2.RANSAC,
 				reprojThresh)
-
+			E = self.calculate_essential_matrix(matches, kpsA, kpsB)
 			# return the matches along with the homograpy matrix
 			# and status of each matched point
-			return (matches, H, status)
+			print("E",E)
+			print("H",H)
+
+			self.calculate_possible_solutions(E,np.array([[475.847198,0,314.711304],[0,475.847229,245.507904],[0,0,1]], dtype = np.float32)) 
+
+			return (matches, E, status)
 
 		# otherwise, no homograpy could be computed
 		return None
+	def calculate_essential_matrix(self,matches, kp1, kp2):
+		
+		img_points1, img_points2 = [], []
+		camera_mat1 = [[475.847198,0,314.711304],[0,475.847229,245.507904],[0,0,1]]
+		camera_mat2 = [[475.847198,0,314.711304],[0,475.847229,245.507904],[0,0,1]]
 
+		camera_img1 = np.array(camera_mat1, dtype=np.float32)
+		camera_img2 = np.array(camera_mat2, dtype=np.float32)
+
+		for match in range(0,len(matches)):
+			img_points1.append(kp1[match])
+			img_points2.append(kp2[match])
+			
+		img_points1 = np.array(img_points1, dtype=np.int32)
+		img_points2 = np.array(img_points2, dtype=np.int32)
+		for _i in range(0,len(matches)):
+			print(img_points1[_i])
+			
+		fundamental_mat , mask = cv2.findFundamentalMat(points1 = img_points1, 
+												points2 = img_points2,
+												method = cv2.FM_RANSAC,ransacReprojThreshold = 1.,confidence  = 0.99,mask = None)
+	    
+		# print(fundamental_mat)
+		return fundamental_mat.astype(np.float64)
+		# The essential matrix E, is calculated as:
+		#         E = K_2^T * F * K_1
+		# where K_2 is the camera of the second image,
+		# K_1 is the camera of the first image and F
+		# the fundamental matrix
+		# return camera_img2.astype(np.float64).T.dot(fundamental_mat.astype(np.float64)).dot(camera_img1.astype(np.float64))
+	def calculate_possible_solutions(self, essential_matrix, camera):
+		E = essential_matrix
+		print("E: \n", E)
+		W = np.array([0, -1, 0, 1,  0, 0, 0,  0, 1 ], dtype = np.float64).reshape(3,3)
+		print("\n\nW:", W)
+		U,D,V = np.linalg.svd(np.array(E, dtype=np.float64))
+			# We calculated two ways you can have
+			# the rotation matrix from the decomposition
+			# in singular values ​​of the essential matrix
+			#    * R = U·W·V^T
+		R_uwvt = U.dot(W).dot(V.T)
+			#    * R = U·W^T·V^T
+		R_uwtvt = U.dot(W.T).dot(V.T)
+			# The matrix "t" can be obtained from the last
+			# U column, but the sign is unknown, so
+			# four possible solutions appear depending on the value
+			# of R and the sign of t
+		T = U[:,-1].reshape(1,3).T
+		P_uwvt = camera.dot(np.hstack((R_uwvt, T)))
+		P_neg_uwvt = camera.dot(np.hstack((R_uwvt, -T)))
+		P_uwtvt = camera.dot(np.hstack((R_uwtvt, T)))
+		P_neg_uwtvt = camera.dot(np.hstack((R_uwtvt, -T)))
+		print("\nEstimated Cameras:")
+		print("P = UWV^T:\n", P_uwvt, "\n")
+		print("P = -UWV^T:\n", P_neg_uwvt, "\n")
+		print("P = UW^TV^T:\n", P_uwtvt, "\n")
+		print("P = -UW^TV^T:\n", P_neg_uwtvt, "\n")
+		return P_uwvt, P_neg_uwvt, P_uwtvt, P_neg_uwtvt
 	def drawMatches(self, imageA, imageB, kpsA, kpsB, matches, status):
 		# initialize the output visualization image
 		(hA, wA) = imageA.shape[:2]
