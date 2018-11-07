@@ -2,7 +2,7 @@
 # python stitch.py --first images/bryce_left_01.png --second images/bryce_right_01.png 
 
 # import the necessary packages
-from panorama import Stitcher
+from pyimagesearch.panorama import Stitcher
 import argparse
 import imutils
 import cv2
