@@ -28,11 +28,11 @@ class Stitcher:
 		# otherwise, apply a perspective warp to stitch the images
 		# together
 		(matches, H, status) = M
-		result = cv2.warpPerspective(imageA, H,
+		result = cv2.warpPerspective(imageA, H[:2][:2],
 			(imageA.shape[1] + imageB.shape[1], imageA.shape[0]))
 		result[0:imageB.shape[0], 0:imageB.shape[1]] = imageB
 
-		imageB1 = cv2.warpPerspective(imageB, H,(imageB.shape[1],imageB.shape[0]))
+		imageB1 = cv2.warpPerspective(imageB, H[:2][:2],(imageB.shape[1],imageB.shape[0]))
 		# check to see if the keypoint matches should be visualized
 		if showMatches:
 			vis = self.drawMatches(imageA, imageB, kpsA, kpsB, matches,
@@ -106,9 +106,10 @@ class Stitcher:
 			print("E",E)
 			print("H",H)
 
+			p1 ,p2 ,p3 ,p4 = \
 			self.calculate_possible_solutions(E,np.array([[475.847198,0,314.711304],[0,475.847229,245.507904],[0,0,1]], dtype = np.float32)) 
 
-			return (matches, E, status)
+			return (matches, p1, status)
 
 		# otherwise, no homograpy could be computed
 		return None
@@ -135,13 +136,14 @@ class Stitcher:
 												method = cv2.FM_RANSAC,ransacReprojThreshold = 1.,confidence  = 0.99,mask = None)
 	    
 		# print(fundamental_mat)
-		return fundamental_mat.astype(np.float64)
+		# return fundamental_mat.astype(np.float64)
 		# The essential matrix E, is calculated as:
 		#         E = K_2^T * F * K_1
 		# where K_2 is the camera of the second image,
 		# K_1 is the camera of the first image and F
 		# the fundamental matrix
-		# return camera_img2.astype(np.float64).T.dot(fundamental_mat.astype(np.float64)).dot(camera_img1.astype(np.float64))
+		return camera_img2.astype(np.float64).T.dot(fundamental_mat.astype(np.float64)).dot(camera_img1.astype(np.float64))
+	
 	def calculate_possible_solutions(self, essential_matrix, camera):
 		E = essential_matrix
 		print("E: \n", E)
@@ -160,16 +162,26 @@ class Stitcher:
 			# four possible solutions appear depending on the value
 			# of R and the sign of t
 		T = U[:,-1].reshape(1,3).T
+		newrow = [0,0,0,1]
 		P_uwvt = camera.dot(np.hstack((R_uwvt, T)))
+		P_uwvt = np.vstack([P_uwvt,newrow])
+
 		P_neg_uwvt = camera.dot(np.hstack((R_uwvt, -T)))
+		P_neg_uwvt = np.vstack([P_neg_uwvt,newrow])
+
 		P_uwtvt = camera.dot(np.hstack((R_uwtvt, T)))
+		P_uwtvt = np.vstack([P_uwtvt,newrow])
+
 		P_neg_uwtvt = camera.dot(np.hstack((R_uwtvt, -T)))
+		P_neg_uwtvt = np.vstack([P_neg_uwtvt,newrow])
+
 		print("\nEstimated Cameras:")
 		print("P = UWV^T:\n", P_uwvt, "\n")
 		print("P = -UWV^T:\n", P_neg_uwvt, "\n")
 		print("P = UW^TV^T:\n", P_uwtvt, "\n")
 		print("P = -UW^TV^T:\n", P_neg_uwtvt, "\n")
 		return P_uwvt, P_neg_uwvt, P_uwtvt, P_neg_uwtvt
+	
 	def drawMatches(self, imageA, imageB, kpsA, kpsB, matches, status):
 		# initialize the output visualization image
 		(hA, wA) = imageA.shape[:2]
