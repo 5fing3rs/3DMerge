@@ -40,7 +40,7 @@ Contains the results of running algorithms on multiple images
 ### Src
 Contains the code 
 
-
+    
 ## Progress so far
 Initially we were using homography matrix for transformation. However that approach turned out to be wrong as the transformation wasnt able to take depth into account. Now for multiple viewpoints we are using essential matrix to find out the transfromation in order to stitch them.
 
