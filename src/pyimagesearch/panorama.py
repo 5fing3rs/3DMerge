@@ -2,11 +2,15 @@
 import numpy as np
 import imutils
 import cv2
+from ess_stitch import *
 
 class Stitcher:
 	def __init__(self):
 		# determine if we are using OpenCV v3.X
 		self.isv3 = imutils.is_cv3()
+		self.right_intrinsic = np.array([[475.847198,0,314.711304],[0,475.847229,245.507904],[0,0,1]], dtype = np.float32)
+		self.left_inv = np.linalg.inv(self.right_intrinsic)
+
 
 	def stitch(self, images, ratio=0.75, reprojThresh=4.0,
 		showMatches=False):
@@ -165,6 +169,8 @@ class Stitcher:
 		newrow = [0,0,0,1]
 		P_uwvt = camera.dot(np.hstack((R_uwvt, T)))
 		P_uwvt = np.vstack([P_uwvt,newrow])
+		self.extrinsic = P_uwvt
+		self.extrinsic_inv = np.linalg.inv(self.extrinsic)
 
 		P_neg_uwvt = camera.dot(np.hstack((R_uwvt, -T)))
 		P_neg_uwvt = np.vstack([P_neg_uwvt,newrow])
@@ -202,3 +208,40 @@ class Stitcher:
 
 		# return the visualization
 		return vis
+		
+	def apply_disparity(self, img, disp):
+		batch_size, _, height, width = img.size()
+    	# Original coordinates of pixels
+    	#DIr is always left
+    	# x_base = np.linspace(0, 1, width).repeat(batch_size, height, 1).type_as(img)
+    	# y_base = np.linspace(0, 1, height).repeat(batch_size, width, 1).transpose(1, 2).type_as(img)    
+        # Apply shift in X direction
+        # x_shifts = disp[:, 0, :, :]  # Disparity is passed in NCHW format with 1 channel
+
+        # flow_field = torch.stack((x_base + x_shifts, y_base), dim=3)
+
+        # In grid_sample coordinates are assumed to be between -1 and 1
+
+        # output = F.grid_sample(img, 2 * flow_field - 1, mode='bilinear', padding_mode='zeros')
+		grid = meshgrid_abs(height, width)
+		grid = tile(grid.unsqueeze(0), 0, batch_size)
+		# camera = self._camera
+		
+		intrinsic_mat_inv = self.left_inv
+		intrinsic_mat = self.right_intrinsic
+		
+		cam_coords = img2cam(disp, grid, intrinsic_mat_inv)  # [B x H * W x 3]
+		cam_coords = np.concatenate([cam_coords, torch.ones(batch_size, height * width, 1)], -1)  # [B x H * W x 4]
+		
+		extrinsic_mat = self.extrinsic
+		world_coords = cam2world(cam_coords, extrinsic_mat)  # [B x H * W x 4]
+		
+		extrinsic_inv = self.extrinsic_inv
+		other_cam_coords = world2cam(world_coords, extrinsic_inv)  # [B x H * W x 4]
+		
+		other_cam_coords = other_cam_coords[:, :, :3]  # [B x H * W x 3]
+		
+		other_image_coords = cam2img(other_cam_coords, intrinsic_mat)  # [B x H * W x 2]
+		
+		# projected_img = self._spatial_transformer(img, other_image_coords)
+		# return projected_img
