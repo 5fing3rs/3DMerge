@@ -137,6 +137,7 @@ class Stitcher:
 	    
 		# print(fundamental_mat)
 		# return fundamental_mat.astype(np.float64)
+		return fundamental_mat.astype(np.float64)
 		# The essential matrix E, is calculated as:
 		#         E = K_2^T * F * K_1
 		# where K_2 is the camera of the second image,
@@ -144,6 +145,7 @@ class Stitcher:
 		# the fundamental matrix
 		return camera_img2.astype(np.float64).T.dot(fundamental_mat.astype(np.float64)).dot(camera_img1.astype(np.float64))
 	
+		# return camera_img2.astype(np.float64).T.dot(fundamental_mat.astype(np.float64)).dot(camera_img1.astype(np.float64))
 	def calculate_possible_solutions(self, essential_matrix, camera):
 		E = essential_matrix
 		print("E: \n", E)
@@ -177,6 +179,7 @@ class Stitcher:
 
 		print("\nEstimated Cameras:")
 		print("P = UWV^T:\n", P_uwvt, "\n")
+		print("P = UWV^T:\n", P_uwvt[0:2][0:2], "\n")
 		print("P = -UWV^T:\n", P_neg_uwvt, "\n")
 		print("P = UW^TV^T:\n", P_uwtvt, "\n")
 		print("P = -UW^TV^T:\n", P_neg_uwtvt, "\n")
