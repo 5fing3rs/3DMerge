@@ -231,7 +231,7 @@ class Stitcher:
 		intrinsic_mat = self.right_intrinsic
 		
 		cam_coords = img2cam(disp, grid, intrinsic_mat_inv)  # [B x H * W x 3]
-		cam_coords = np.concatenate([cam_coords, torch.ones(batch_size, height * width, 1)], -1)  # [B x H * W x 4]
+		cam_coords = np.concatenate((cam_coords,np.ones((batch_size, height * width, 1))),-1)  # [B x H * W x 4]
 		
 		extrinsic_mat = self.extrinsic
 		world_coords = cam2world(cam_coords, extrinsic_mat)  # [B x H * W x 4]
@@ -243,5 +243,16 @@ class Stitcher:
 		
 		other_image_coords = cam2img(other_cam_coords, intrinsic_mat)  # [B x H * W x 2]
 		
-		# projected_img = self._spatial_transformer(img, other_image_coords)
-		# return projected_img
+		projected_img = self.spatial_transformer(img, other_image_coords)
+		return projected_img
+
+	def spatial_tranformer(self,img,coords):
+		"""A wrapper over binlinear_sampler(), taking absolute coords as input."""
+		batch,ch,height,width = img.shape
+		px = coords[:, :, 0]
+		py = coords[:, :, 1]
+		# Normalize coordinates to [-1, 1] to send to _bilinear_sampler.
+		px = px/(width-1)* 2.0- 1.0
+		py = py / (height - 1) * 2.0 - 1.0
+		output_img = self.bilinear_sampler(self.device, img, px, py)
+		return output_img
