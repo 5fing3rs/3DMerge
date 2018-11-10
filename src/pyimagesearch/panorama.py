@@ -256,3 +256,72 @@ class Stitcher:
 		py = py / (height - 1) * 2.0 - 1.0
 		output_img = self.bilinear_sampler(self.device, img, px, py)
 		return output_img
+	
+	def bilinear_sampler(self,device, im, x, y):
+		"""
+		Perform bilinear sampling on im given list of x, y coordinates.
+       	Implements the differentiable sampling mechanism with bilinear kernel
+       	in https://arxiv.org/abs/1506.02025.
+       	x,y are tensors specifying normalized coordinates [-1, 1] to be sampled on im.
+       	For example, (-1, -1) in (x, y) corresponds to pixel location (0, 0) in im,
+       	and (1, 1) in (x, y) corresponds to the bottom right pixel in im.
+
+       	:param im: Batch of images with shape [B, h, w, channels].
+       	:param x: Matrix of normalized x coordinates in [-1, 1], with shape [B, h, w].
+       	:param y: Matrix of normalized y coordinates in [-1, 1], with shape [B, h, w].
+       	:return: Sampled image with shape [B, C, H, W].
+       	"""
+       	x = np.reshape(x,-1)
+       	y = np.reshape(y,-1)
+       	# Constants.
+       	batch_size, channels, height, width = im.shape
+
+       	max_y = int(height - 1)
+       	max_x = int(width - 1)
+
+       	# Scale indices from [-1, 1] to [0, width - 1] or [0, height - 1].
+       	x = (x + 1.0) * (width - 1.0) / 2.0
+       	y = (y + 1.0) * (height - 1.0) / 2.0
+
+       	# Compute the coordinates of the 4 pixels to sample from.
+       	x0 = np.floor(x)
+       	x1 = x0 + 1
+       	y0 = np.floor(y)
+       	y1 = y0 + 1
+
+       	x0 = np.clip(x0, 0.0, max_x)
+       	x1 = np.clip(x1, 0.0, max_x)
+       	y0 = np.clip(y0, 0.0, max_y)
+       	y1 = np.clip(y1, 0.0, max_y)
+       	dim2 = width
+       	dim1 = width * height
+
+       	# Create base index.
+       	base = np.arange(batch_size) * dim1
+       	base = np.reshape(base, [-1, 1])
+       
+
+       	base_y0 = base + y0 * dim2
+       	base_y1 = base + y1 * dim2
+       	idx_a = base_y0 + x0
+       	idx_b = base_y1 + x0
+       	idx_c = base_y0 + x1
+       	idx_d = base_y1 + x1
+       	idx_a, idx_b, idx_c, idx_d = [_.type(np.float) for _ in [idx_a, idx_b, idx_c, idx_d]]
+
+       # Use indices to lookup pixels in the flat image and restore channels dim.
+       	im_flat = np.reshape(im, (-1, channels))
+       	pixel_a = im_flat[idx_a]
+       	pixel_b = im_flat[idx_b]
+       	pixel_c = im_flat[idx_c]
+       	pixel_d = im_flat[idx_d]
+
+       # And finally calculate interpolated values.
+       	wa = np.expand_dims(((x1 - x) * (y1 - y)), axis = 1)
+       	wb = np.expand_dims((x1 - x) * (1.0 - (y1 - y)), axis = 1)
+       	wc = np.expand_dims(((1.0 - (x1 - x)) * (y1 - y)), axis = 1)
+       	wd = np.expand_dims(((1.0 - (x1 - x)) * (1.0 - (y1 - y))), axis = 1)
+
+       	output = wa * pixel_a + wb * pixel_b + wc * pixel_c + wd * pixel_d
+       	output = np.reshape(output, (batch_size, channels, height, width))
+		return output
