@@ -2,9 +2,9 @@
 import numpy as np
 import imutils
 import cv2
-from ess_stitch import *
+from ess_stitch import Helper
 
-class Stitcher:
+class Stitcher(Helper):
 	def __init__(self):
 		# determine if we are using OpenCV v3.X
 		self.isv3 = imutils.is_cv3()
